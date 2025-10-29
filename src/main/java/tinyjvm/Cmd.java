@@ -9,70 +9,67 @@ public class Cmd {
     private String classpath;
     private String mainClass;
     private String[] appArgs; // 传递给目标Java程序的参数
+    private String xjreOption;
 
     private Cmd() {
     }
 
     public static Cmd parse(String[] args) {
         Cmd cmd = new Cmd();
-        // 我们假设参数格式是固定的，不做复杂的动态解析
-        // 例如：java [-options] class [args...]
         if (args == null || args.length == 0) {
             cmd.helpFlag = true;
             return cmd;
         }
 
-        // 查找 -cp 或 -classpath
-        int cpIndex = -1;
-        for (int i = 0; i < args.length; i++) {
-            if ("-cp".equals(args[i]) || "-classpath".equals(args[i])) {
-                cpIndex = i;
-                break;
+        int i = 0;
+        while (i < args.length) {
+            String arg = args[i];
+            switch (arg) {
+                case "-help":
+                case "-?":
+                    cmd.helpFlag = true;
+                    return cmd;
+                case "-version":
+                    cmd.versionFlag = true;
+                    return cmd;
+                case "-Xjre":
+                    if (i + 1 < args.length) {
+                        cmd.xjreOption = args[i + 1];
+                        i += 2;
+                    } else {
+                        System.err.println("Error: Missing Xjre value after -Xjre");
+                        cmd.helpFlag = true;
+                        return cmd;
+                    }
+                    break;
+                case "-cp":
+                case "-classpath":
+                    if (i + 1 < args.length) {
+                        cmd.classpath = args[i + 1];
+                        i += 2;
+                    } else {
+                        System.err.println("Error: Missing classpath value after -cp/-classpath");
+                        cmd.helpFlag = true;
+                        return cmd;
+                    }
+                    break;
+                default:
+                    // 第一个不是JVM选项的参数就是主类名
+                    cmd.mainClass = arg;
+                    if (i + 1 < args.length) {
+                        cmd.appArgs = Arrays.copyOfRange(args, i + 1, args.length);
+                    }
+                    i = args.length; // 跳出循环
+                    break;
             }
         }
 
-        if (cpIndex != -1) {
-            // -cp 后面必须跟一个路径
-            if (cpIndex + 1 < args.length) {
-                cmd.classpath = args[cpIndex + 1];
-                // 移除 -cp 和它的值，剩下的就是主类和程序参数
-                String[] remainingArgs = new String[args.length - 2];
-                System.arraycopy(args, 0, remainingArgs, 0, cpIndex);
-                System.arraycopy(args, cpIndex + 2, remainingArgs, cpIndex, args.length - (cpIndex + 2));
-                args = remainingArgs;
-            } else {
-                System.err.println("Error: Missing classpath value after -cp/-classpath");
-                cmd.helpFlag = true;
-                return cmd;
-            }
-        }
-
-        // 此时的 args 应该只剩下主类和程序参数了
-        if (args.length > 0) {
-            // 处理 -help 和 -version
-            if ("-help".equals(args[0]) || "-?".equals(args[0])) {
-                cmd.helpFlag = true;
-                return cmd;
-            }
-            if ("-version".equals(args[0])) {
-                cmd.versionFlag = true;
-                return cmd;
-            }
-
-            cmd.mainClass = args[0];
-            if (args.length > 1) {
-                cmd.appArgs = Arrays.copyOfRange(args, 1, args.length);
-            }
-        } else {
-            // 如果移除了 -cp 后没有参数了，也显示帮助
+        if (cmd.mainClass == null) {
             cmd.helpFlag = true;
         }
-
-        // 如果没有指定-cp，默认使用当前目录
         if (cmd.classpath == null || cmd.classpath.isEmpty()) {
             cmd.classpath = ".";
         }
-
         return cmd;
     }
 
@@ -82,4 +79,15 @@ public class Cmd {
     public String getClasspath() { return classpath; }
     public String getMainClass() { return mainClass; }
     public String[] getAppArgs() { return appArgs; }
+    public String getXjreOption() { return xjreOption; }
+    public String getCpOption() { return classpath; }
+
+    public static void printUsage() {
+        System.out.println("Usage: java [-options] class [args...]");
+        System.out.println("    -cp <dir> or -classpath <dir>   Specify where to find user class files");
+        System.out.println("    -Xjre <dir>                     Specify where to find jre");
+        System.out.println("    -help or -?                     Print this help message");
+        System.out.println("    -version                        Print version and exit");
+    }
+
 }

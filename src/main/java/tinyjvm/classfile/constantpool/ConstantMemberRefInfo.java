@@ -2,8 +2,6 @@ package tinyjvm.classfile.constantpool;
 
 import tinyjvm.classfile.ClassReader;
 
-import tinyjvm.classfile.ClassReader;
-
 // This is a base class for Fieldref, Methodref, and InterfaceMethodref
 public class ConstantMemberRefInfo implements ConstantInfo {
     public int classIndex;

@@ -2,7 +2,6 @@ package tinyjvm.classfile;
 
 // We will create these classes in the next steps
 import tinyjvm.classfile.constantpool.ConstantPool;
-import tinyjvm.classfile.member.MemberInfo;
 
 public class ClassFile {
     // Magic number, must be 0xCAFEBABE
@@ -40,15 +39,15 @@ public class ClassFile {
          cf.constantPool = ConstantPool.read(reader);
 
         // 3. Read Access Flags, This/Super Class, Interfaces
-        // cf.accessFlags = reader.readU2();
-        // cf.thisClass = reader.readU2();
-        // cf.superClass = reader.readU2();
-        // cf.interfaces = reader.readU2Array();
+         cf.accessFlags = reader.readU2();
+         cf.thisClass = reader.readU2();
+         cf.superClass = reader.readU2();
+         cf.interfaces = reader.readU2Array();
 
         // 4. Read Fields and Methods
         // These will be implemented in later steps
-        // cf.fields = MemberInfo.readMembers(reader, cf.constantPool);
-        // cf.methods = MemberInfo.readMembers(reader, cf.constantPool);
+         cf.fields = MemberInfo.readMembers(reader, cf.constantPool);
+         cf.methods = MemberInfo.readMembers(reader, cf.constantPool);
 
         // For now, let's just parse the magic and version to test
         System.out.println("Magic: " + String.format("0x%X", cf.magic));
@@ -76,5 +75,20 @@ public class ClassFile {
     public String getClassName() {
         // return this.constantPool.getClassName(this.thisClass);
         return "Not implemented yet";
+    }
+
+    /**
+     * 在该类的所有方法中查找主方法 "main"。
+     * 主方法的签名是：名称为 "main"，描述符为 "([Ljava/lang/String;)V"。
+     * @return 如果找到，返回对应的 MemberInfo 对象；否则返回 null。
+     */
+    public MemberInfo getMainMethod() {
+        for (MemberInfo method : methods) {
+            // 同时检查方法名和描述符
+            if ("main".equals(method.getName()) && "([Ljava/lang/String;)V".equals(method.getDescriptor())) {
+                return method;
+            }
+        }
+        return null; // 没有找到 main 方法
     }
 }

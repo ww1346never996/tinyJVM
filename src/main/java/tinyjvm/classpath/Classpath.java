@@ -6,41 +6,68 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 public class Classpath {
-    // 我们只处理目录形式的类路径，不处理 JAR 文件
-    private String[] dirPaths;
+    private final Entry bootClasspath; // 启动类路径 (jre/lib/*)
+    private final Entry userClasspath; // 用户类路径 (-cp)
 
-    public Classpath(String classpathStr) {
-        // 根据操作系统的路径分隔符来分割字符串
-        // Windows是分号(;) , Linux/macOS是冒号(:)
-        dirPaths = classpathStr.split(File.pathSeparator);
+    public Classpath(String jreOption, String cpOption) {
+        // 1. 解析启动类路径
+        this.bootClasspath = parseBootClasspath(jreOption);
+        // 2. 解析用户类路径
+        this.userClasspath = parseUserClasspath(cpOption);
     }
 
     /**
-     * 根据类名读取类的字节码
-     * @param className 格式: java.lang.Object 或 a.b.c.SimpleTest
-     * @return 类的字节码数据，如果找不到则返回 null
-     * @throws IOException 读取文件时发生错误
+     * 按顺序搜索 class 文件：
+     * 1. 首先在启动类路径 (boot) 中查找。
+     * 2. 如果找不到，再在用户类路径 (user) 中查找。
+     * @param className 类的全限定名，格式为 "java/lang/Object"
+     * @return 类的字节码数据
+     * @throws Exception 如果找不到类
      */
-    public byte[] readClass(String className) throws IOException {
-        // 1. 将类名转换为相对文件路径
-        // a.b.c.SimpleTest -> a/b/c/SimpleTest.class
-        String classFilePath = className.replace('.', File.separatorChar) + ".class";
+    public byte[] readClass(String className) throws Exception {
+        className = className + ".class";
 
-        // 2. 遍历我们所有的类路径目录
-        for (String path : dirPaths) {
-            // 3. 组合成完整的绝对路径
-            String absolutePath = Paths.get(path, classFilePath).toString();
-            File classFile = new File(absolutePath);
-
-            // 4. 检查文件是否存在
-            if (classFile.exists() && classFile.isFile()) {
-                System.out.println("[Classpath] Found class: " + className + " at " + absolutePath);
-                // 5. 读取文件所有字节并返回
-                return Files.readAllBytes(classFile.toPath());
+        try {
+            // 先尝试从 boot classpath 读取
+            return bootClasspath.readClass(className);
+        } catch (Exception e) {
+            // boot 中找不到，再尝试从 user classpath 读取
+            if (userClasspath != null) {
+                return userClasspath.readClass(className);
             }
         }
 
-        // 遍历完所有路径都没找到
-        return null;
+        throw new ClassNotFoundException("Class not found: " + className);
+    }
+
+    private Entry parseBootClasspath(String jreOption) {
+        String jreDir = getJreDir(jreOption);
+        // jre/lib/*
+        String jreLibPath = Paths.get(jreDir, "lib", "*").toString();
+        return new WildcardEntry(jreLibPath);
+    }
+
+    private Entry parseUserClasspath(String cpOption) {
+        if (cpOption == null || cpOption.isEmpty()) {
+            // 如果用户没有提供 -cp，默认使用当前目录 "."
+            cpOption = ".";
+        }
+        return Entry.create(cpOption);
+    }
+
+    private String getJreDir(String jreOption) {
+        if (jreOption != null && Files.exists(Paths.get(jreOption))) {
+            return jreOption;
+        }
+        // 如果用户没提供，尝试在当前目录下找 jre
+        if (Files.exists(Paths.get("./jre"))) {
+            return "./jre";
+        }
+        // 最后尝试从 JAVA_HOME 环境变量找
+        String javaHome = System.getenv("JAVA_HOME");
+        if (javaHome != null) {
+            return Paths.get(javaHome, "jre").toString();
+        }
+        throw new RuntimeException("Can not find JRE folder!");
     }
 }
